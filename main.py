@@ -16,22 +16,26 @@ MODEL_DIR = '~/scratch/resnet/models'
 DATA_DIR = '~/scratch/resnet/data'
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
-# note: may to try dropout + more augmentation to avoid overfitting
+# note: may need to try dropout + more augmentation to avoid overfitting
 
 ### SETTINGS ###
 
 # Parse command line arguments
 def parse_args():
     parser = argparse.ArgumentParser(description='Train ResNet models on Country211 dataset')
-    parser.add_argument('--depth', type=str, choices=['18', '34', '50'], default='18',
-                        help='ResNet depth (18, 34, or 50)')
+    parser.add_argument('--depth', type=str, choices=['18', '34', '50', '101', '152'], default='18',
+                        help='ResNet depth (18, 34, 50, 101, 152)')
     parser.add_argument('--residual', type=str, choices=['true', 'false'], default='true',
                         help='Use residual connections (true or false)')
     parser.add_argument('--transfer', type=str, choices=['true', 'false'], default='true',
                         help='Use transfer learning (true or false)')
+    parser.add_argument('--dataset', type=str, choices=['country', 'geo'], default='country',
+                        help='which training set to use')
+    parser.add_argument('--save', type=str, choices=['true', 'false'], default='true',
+                        help='Save the model parameters')
     parser.add_argument('--batch-size', type=int, default=128,
                         help='Batch size for training')
-    parser.add_argument('--epochs', type=int, default=50,
+    parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate')
@@ -56,6 +60,7 @@ class ResNetNoResidual(nn.Module):
         self.layer4 = self._modify_layer(base_model.layer4)
         
         self.avgpool = base_model.avgpool
+        self.dropout = nn.Dropout(p=0.2)
         self.fc = nn.Linear(base_model.fc.in_features, num_classes)
         
     def _modify_layer(self, layer):
@@ -101,6 +106,7 @@ class ResNetNoResidual(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
+        x = self.dropout(x)
         x = self.fc(x)
         
         return x
@@ -113,13 +119,20 @@ def get_model(depth, use_residual, transfer_learning, num_classes):
         base_model = models.resnet34(weights='IMAGENET1K_V1' if transfer_learning else None)
     elif depth == '50':
         base_model = models.resnet50(weights='IMAGENET1K_V1' if transfer_learning else None)
+    elif depth == '101':
+        base_model = models.resnet101(weights='IMAGENET1K_V1' if transfer_learning else None)
+    elif depth == '152':
+        base_model = models.resnet152(weights='IMAGENET1K_V1' if transfer_learning else None)
     else:
         raise ValueError(f"Unsupported depth: {depth}")
     
     if use_residual:
         # If using residual connections, just modify the final layer
         model = base_model
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        model.fc = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(model.fc.in_features, num_classes)
+        )
     else:
         # If not using residual connections, create a custom model
         model = ResNetNoResidual(base_model, num_classes)
@@ -239,6 +252,7 @@ def main():
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomAffine(degrees=30, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -293,9 +307,10 @@ def main():
     print(f"Training completed in {elapsed_time:.2f} seconds")
     
     # Save the best model
-    model_path = os.path.join(MODEL_DIR, f"{model_name}.pth")
-    torch.save(best_model_state, model_path)
-    print(f"Best model saved to {model_path}")
+    if args.save:
+        model_path = os.path.join(MODEL_DIR, f"{model_name}.pth")
+        torch.save(best_model_state, model_path)
+        print(f"Best model saved to {model_path}")
     
     # Save training history
     history_path = os.path.join(MODEL_DIR, f"{model_name}_history.json")

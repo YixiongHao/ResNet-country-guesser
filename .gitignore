@@ -8,6 +8,7 @@ __pycache__/
 
 # all symlinks
 ~/*
+slurm_out/*
 
 # Distribution / packaging
 .Python
