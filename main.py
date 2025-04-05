@@ -12,7 +12,7 @@ import json
 ### SETTINGS ###
 
 #yall shouldnt need to change these two
-MODEL_DIR = '~/scratch/resnet/models'
+MODEL_DIR = '/home/hice1/yhao96/ResNet-country-guesser/config+history'
 DATA_DIR = '~/scratch/resnet/data'
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
@@ -27,18 +27,20 @@ def parse_args():
                         help='ResNet depth (18, 34, 50, 101, 152)')
     parser.add_argument('--residual', type=str, choices=['true', 'false'], default='true',
                         help='Use residual connections (true or false)')
-    parser.add_argument('--transfer', type=str, choices=['true', 'false'], default='true',
+    parser.add_argument('--transfer', type=str, choices=['true', 'false'], default='false',
                         help='Use transfer learning (true or false)')
     parser.add_argument('--dataset', type=str, choices=['country', 'geo'], default='country',
                         help='which training set to use')
-    parser.add_argument('--save', type=str, choices=['true', 'false'], default='true',
+    parser.add_argument('--save', type=str, choices=['true', 'false'], default='false',
                         help='Save the model parameters')
-    parser.add_argument('--batch-size', type=int, default=128,
+    parser.add_argument('--batch-size', type=int, default=256,
                         help='Batch size for training')
     parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.0005,
                         help='Learning rate')
+    parser.add_argument('--wd', type=float, default=0.0001, 
+                        help='Weight decay')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for reproducibility')
     return parser.parse_args()
@@ -235,6 +237,7 @@ def main():
     # Convert string arguments to appropriate types
     use_residual = args.residual.lower() == 'true'
     transfer_learning = args.transfer.lower() == 'true'
+    save = args.save.lower() == 'true'
     
     # Set random seed for reproducibility
     torch.manual_seed(args.seed)
@@ -253,6 +256,7 @@ def main():
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.RandomAffine(degrees=30, translate=(0.1, 0.1), scale=(0.8, 1.2), shear=10),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -297,7 +301,7 @@ def main():
     
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
     
     # Train the model
     print(f"Training model for {args.epochs} epochs...")
@@ -307,18 +311,12 @@ def main():
     print(f"Training completed in {elapsed_time:.2f} seconds")
     
     # Save the best model
-    if args.save:
+    if save:
         model_path = os.path.join(MODEL_DIR, f"{model_name}.pth")
         torch.save(best_model_state, model_path)
         print(f"Best model saved to {model_path}")
     
-    # Save training history
-    history_path = os.path.join(MODEL_DIR, f"{model_name}_history.json")
-    with open(history_path, 'w') as f:
-        json.dump(history, f)
-    print(f"Training history saved to {history_path}")
-    
-    # Save model configuration
+    # Save model configuration and history
     config = {
         'depth': args.depth,
         'residual': use_residual,
@@ -329,10 +327,11 @@ def main():
         'epochs': args.epochs,
         'batch_size': args.batch_size,
         'learning_rate': args.lr,
-        'training_time': elapsed_time
+        'training_time': elapsed_time,
+        'history': history
     }
     
-    config_path = os.path.join(MODEL_DIR, f"{model_name}_config.json")
+    config_path = os.path.join(MODEL_DIR, f"{model_name}_history.json")
     with open(config_path, 'w') as f:
         json.dump(config, f)
     print(f"Model configuration saved to {config_path}")

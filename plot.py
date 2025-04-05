@@ -3,7 +3,7 @@ import sys
 import matplotlib.pyplot as plt
 import re
 
-PLOT_DIR = 'plots'
+PLOT_DIR = 'graphs'
 
 def parse_model_settings(filename):
     """
@@ -65,5 +65,5 @@ if __name__ == '__main__':
     json_file = sys.argv[1]
     settings = parse_model_settings(json_file)
     with open(json_file, 'r') as f:
-        history = json.load(f)
+        history = json.load(f)['history']
     plot_history(history, settings)

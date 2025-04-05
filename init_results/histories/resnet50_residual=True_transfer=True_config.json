@@ -1,0 +1,1 @@
+{"depth": "50", "residual": true, "transfer_learning": true, "num_classes": 211, "best_val_accuracy": 8.341232227488153, "best_epoch": 60, "epochs": 80, "batch_size": 128, "learning_rate": 0.001, "training_time": 1994.4228270053864}
