@@ -15,6 +15,7 @@ import json
 MODEL_DIR = "/home/hice1/yhao96/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
 KAGGLE_DIR = "~/scratch/kaggle_dataset"
+MIN_IMAGES_PER_CLASS = 50
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
 # note: may need to try dropout + more augmentation to avoid overfitting
@@ -108,9 +109,8 @@ def load_dataset(dataset, train_transform):
             class_count[data.classes[label]] += 1
 
         # Add classes to filtered data
-        min_images_per_class = 50  # change this to whatever yall want
         for img, label in data:
-            if class_count[data.classes[label]] >= min_images_per_class:
+            if class_count[data.classes[label]] >= MIN_IMAGES_PER_CLASS:
                 filtered_data.append((img, label))
         return filtered_data
 
