@@ -16,6 +16,7 @@ MODEL_DIR = "/home/hice1/kboyce7/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
 KAGGLE_DIR = "~/scratch/kaggle_dataset"
 MIN_IMAGES_PER_CLASS = 50
+MIN_IMAGES_PER_CLASS = 50
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
 # note: may need to try dropout + more augmentation to avoid overfitting
@@ -86,7 +87,7 @@ def load_dataset(dataset, train_transform):
             country_dataset = datasets.Country211(
                 root=DATA_DIR, download=False, transform=train_transform
             )
-            return country_dataset
+            return (country_dataset, 211)
         except:
             print("Error: Country211 dataset not found in torchvision.")
             print(
@@ -102,17 +103,24 @@ def load_dataset(dataset, train_transform):
 
         # Filter out classes with not enough images
         filtered_data = []
-        class_count = {cls: 0 for cls in data.classes}
 
-        # Count images per class
-        for img, label in data:
-            class_count[data.classes[label]] += 1
+        class_count = [0] * len(data.classes)
+        for (
+            _,
+            label,
+        ) in (
+            data.samples
+        ):  # Apparently data.samples doesn't load the images from disk so good for just counting
+            class_count[label] += 1
 
         # Add classes to filtered data
         for img, label in data:
-            if class_count[data.classes[label]] >= MIN_IMAGES_PER_CLASS:
+            if class_count[label] >= MIN_IMAGES_PER_CLASS:
                 filtered_data.append((img, label))
-        return filtered_data
+        filtered_labels = {
+            label for _, label in filtered_data
+        }  # Get number of unique classes
+        return (filtered_data, len(filtered_labels))
 
 
 # Custom ResNet without residual connections
@@ -372,7 +380,7 @@ def main():
 
     # Load dataset
     # so idk if the transforms are the same for both country and kaggle dataset
-    dataset = load_dataset(args.dataset, train_transform)
+    dataset, num_classes = load_dataset(args.dataset, train_transform)
     if dataset == -1:
         return
 
@@ -394,8 +402,10 @@ def main():
         val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8
     )
 
-    # Get the number of classes
-    num_classes = 211  # Country211 has 211 classes
+    # # Get the number of classes
+    # num_classes = 211  # Country211 has 211 classes
+    # if args.dataset == "geo":
+    #     num_classes = 103  # Kaggle  has 211 classes
 
     # Create model
     model_name = (
