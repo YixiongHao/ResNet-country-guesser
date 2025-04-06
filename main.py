@@ -12,7 +12,7 @@ import json
 ### SETTINGS ###
 
 # yall shouldnt need to change these two
-MODEL_DIR = "/home/hice1/yhao96/ResNet-country-guesser/config+history"
+MODEL_DIR = "/home/hice1/kboyce7/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
 KAGGLE_DIR = "~/scratch/kaggle_dataset"
 MIN_IMAGES_PER_CLASS = 50
