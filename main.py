@@ -14,6 +14,7 @@ import json
 
 ### SETTINGS ###
 
+
 # yall shouldnt need to change these two
 MODEL_DIR = "/home/hice1/kboyce7/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
@@ -77,6 +78,7 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility"
     )
+    
     return parser.parse_args()
 
 
