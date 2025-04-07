@@ -112,6 +112,7 @@ class FilteredDataset(Dataset):
     def __init__(self, base_dataset, min_samples=50):
         self.base_dataset = base_dataset
         self.min_samples = min_samples
+        self.samples = base_dataset.samples
 
         # Count label frequencies
         label_counts = defaultdict(int)
