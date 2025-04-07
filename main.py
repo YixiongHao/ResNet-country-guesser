@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
+from torch.utils.data import Dataset
+from PIL import Image
 from tqdm import tqdm
 import time
 import json
@@ -121,6 +123,28 @@ def load_dataset(dataset, train_transform):
             label for _, label in filtered_data
         }  # Get number of unique classes
         return (filtered_data, len(filtered_labels))
+
+
+class TransformedDataset(Dataset):
+    def __init__(self, dataset, indices, transform):
+        self.dataset = dataset
+        self.indices = indices
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        image, label = self.dataset[self.indices[idx]]
+
+        # If the original dataset already returned transformed images,
+        # and you want to re-transform, reload the raw image:
+        if hasattr(self.dataset, "samples"):
+            path, _ = self.dataset.samples[self.indices[idx]]
+            image = Image.open(path).convert("RGB")
+
+        image = self.transform(image)
+        return image, label
 
 
 # Custom ResNet without residual connections
@@ -379,7 +403,6 @@ def main():
     )
 
     # Load dataset
-    # so idk if the transforms are the same for both country and kaggle dataset
     dataset, num_classes = load_dataset(args.dataset, train_transform)
     if dataset == -1:
         return
@@ -390,9 +413,14 @@ def main():
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     # Apply different transforms to validation set
-    val_dataset.dataset = datasets.Country211(
-        root=DATA_DIR, download=False, transform=val_transform
-    )
+    if args.dataset == "country":
+        val_dataset.dataset = datasets.Country211(
+            root=DATA_DIR, download=False, transform=val_transform
+        )
+    elif args.dataset == "geo":
+        val_dataset.dataset = TransformedDataset(
+            dataset, val_dataset.indices, val_transform
+        )
 
     # Create data loaders
     train_loader = DataLoader(
