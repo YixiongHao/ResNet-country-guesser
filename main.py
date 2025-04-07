@@ -6,6 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
 from torch.utils.data import Dataset
+from collections import defaultdict
 from PIL import Image
 from tqdm import tqdm
 import time
@@ -98,30 +99,36 @@ def load_dataset(dataset, train_transform):
     elif dataset == "geo":
         try:
             data = datasets.ImageFolder(KAGGLE_DIR, transform=train_transform)
+            data = FilteredDataset(data, MIN_IMAGES_PER_CLASS)
+            return (data, len(data.classes))
         except:
             print("kaggle geoguesser data set failed to load")
             return -1
 
-        # Filter out classes with not enough images
-        filtered_data = []
 
-        class_count = [0] * len(data.classes)
-        for (
-            _,
-            label,
-        ) in (
-            data.samples
-        ):  # Apparently data.samples doesn't load the images from disk so good for just counting
-            class_count[label] += 1
+class FilteredDataset(Dataset):
+    def __init__(self, base_dataset, min_samples=50):
+        self.base_dataset = base_dataset
+        self.min_samples = min_samples
 
-        # Add classes to filtered data
-        for img, label in data:
-            if class_count[label] >= MIN_IMAGES_PER_CLASS:
-                filtered_data.append((img, label))
-        filtered_labels = {
-            label for _, label in filtered_data
-        }  # Get number of unique classes
-        return (filtered_data, len(filtered_labels))
+        # Count label frequencies
+        label_counts = defaultdict(int)
+        for _, label in base_dataset:
+            label_counts[label] += 1
+
+        # Keep only samples where the label has enough samples
+        self.filtered_indices = [
+            i
+            for i, (_, label) in enumerate(base_dataset)
+            if label_counts[label] >= min_samples
+        ]
+
+    def __len__(self):
+        return len(self.filtered_indices)
+
+    def __getitem__(self, idx):
+        real_idx = self.filtered_indices[idx]
+        return self.base_dataset[real_idx]
 
 
 class TransformedDataset(Dataset):
@@ -401,7 +408,7 @@ def main():
         ]
     )
 
-    # Load dataset
+    # Get dataset iterator
     dataset, num_classes = load_dataset(args.dataset, train_transform)
     if dataset == -1:
         return
