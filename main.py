@@ -143,12 +143,12 @@ class TransformedDataset(Dataset):
         return len(self.indices)
 
     def __getitem__(self, idx):
-        image, label = self.dataset[self.indices[idx]]
+        image, label = self.dataset[idx]
 
         # If the original dataset already returned transformed images,
         # and you want to re-transform, reload the raw image:
         if hasattr(self.dataset, "samples"):
-            path, _ = self.dataset.samples[self.indices[idx]]
+            path, _ = self.dataset.samples[idx]
             image = Image.open(path).convert("RGB")
 
         image = self.transform(image)
