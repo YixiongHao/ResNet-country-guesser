@@ -12,7 +12,7 @@ import json
 ### SETTINGS ###
 
 #yall shouldnt need to change these two
-MODEL_DIR = '/home/hice1/yhao96/ResNet-country-guesser/config+history'
+MODEL_DIR = '/home/hice1/yhao96/ResNet-country-guesser/'
 DATA_DIR = '~/scratch/resnet/data'
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
@@ -37,9 +37,9 @@ def parse_args():
                         help='Batch size for training')
     parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.0005,
+    parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate')
-    parser.add_argument('--wd', type=float, default=0.0001, 
+    parser.add_argument('--wd', type=float, default=0.001, 
                         help='Weight decay')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for reproducibility')
