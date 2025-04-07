@@ -113,21 +113,21 @@ class FilteredDataset(Dataset):
 
         # Count label frequencies
         label_counts = defaultdict(int)
-        for _, label in base_dataset:
+        for _, label in base_dataset.samples:
             label_counts[label] += 1
 
         # Keep only samples where the label has enough samples
-        self.filtered_indices = [
+        self.classes = [
             i
-            for i, (_, label) in enumerate(base_dataset)
+            for i, (_, label) in enumerate(base_dataset.samples)
             if label_counts[label] >= min_samples
         ]
 
     def __len__(self):
-        return len(self.filtered_indices)
+        return len(self.classes)
 
     def __getitem__(self, idx):
-        real_idx = self.filtered_indices[idx]
+        real_idx = self.classes[idx]
         return self.base_dataset[real_idx]
 
 
