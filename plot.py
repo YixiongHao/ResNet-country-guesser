@@ -1,7 +1,9 @@
-import json
+import os
 import sys
-import matplotlib.pyplot as plt
+import glob
+import json
 import re
+import matplotlib.pyplot as plt
 
 PLOT_DIR = 'graphs'
 
@@ -27,6 +29,9 @@ def parse_model_settings(filename):
     return None
 
 def plot_history(history, settings):
+    """
+    Plot loss and accuracy curves for a single model.
+    """
     epochs = range(1, len(history['train_loss']) + 1)
     
     plt.figure(figsize=(12, 5))
@@ -50,20 +55,69 @@ def plot_history(history, settings):
     plt.legend()
     
     plt.tight_layout()
-    # edit path as needed
     depth = settings['depth']
     residual = settings['residual']
     transfer = settings['transfer']
-    plt.savefig(f'{PLOT_DIR}/resnet{depth}_residual={residual}_transfer={transfer}.png')
+    outfile = f"{PLOT_DIR}/resnet{depth}_residual={residual}_transfer={transfer}.png"
+    plt.savefig(outfile)
+    print(f"Saved single model plot to {outfile}")
 
-# Example usage:
+def plot_multiple_histories(folder):
+    """
+    Plots the validation accuracy curves for multiple models.
+    Files are grouped by their 'residual' setting and each group
+    is plotted on a separate graph.
+    """
+    files = glob.glob(os.path.join(folder, "*_history.json"))
+    groups = {"True": [], "False": []}
+    
+    for file in files:
+        settings = parse_model_settings(file)
+        if settings is None:
+            print(f"Skipping file (invalid format): {file}")
+            continue
+        with open(file, 'r') as f:
+            data = json.load(f)
+        history = data['history']
+        # Group by residual setting as a string ("True" or "False")
+        res_key = "True" if settings['residual'] else "False"
+        groups[res_key].append((history, settings))
+    
+    for res_key, items in groups.items():
+        if not items:
+            print(f"No models found for residual={res_key}")
+            continue
+        plt.figure(figsize=(8, 6))
+        # sort by increasing depth
+        items.sort(key=lambda x: x[1]['depth'])
+        for history, settings in items:
+            epochs = range(1, len(history['val_acc']) + 1)
+            label = f"resnet{settings['depth']}"
+            plt.plot(epochs, history['val_acc'], label=label)
+        plt.title(f"Validation Accuracy (Residual={res_key})")
+        plt.xlabel("Epochs")
+        plt.ylabel("Validation Accuracy (%)")
+        plt.legend()
+        outfile = f"{PLOT_DIR}/residual={res_key}.png"
+        plt.savefig(outfile)
+        print(f"Saved multi-model plot for residual={res_key} to {outfile}")
+
 if __name__ == '__main__':
-    # Replace with your actual history dict
     if len(sys.argv) < 2:
-        print("Usage: python plot.py <history_json_file>")
+        print("Usage: python plot.py <history_json_file | history_directory>")
         sys.exit(1)
-    json_file = sys.argv[1]
-    settings = parse_model_settings(json_file)
-    with open(json_file, 'r') as f:
-        history = json.load(f)['history']
-    plot_history(history, settings)
+        
+    input_path = sys.argv[1]
+    
+    if os.path.isdir(input_path):
+        # Multiple models mode
+        plot_multiple_histories(input_path)
+    else:
+        # Single model mode
+        settings = parse_model_settings(input_path)
+        if not settings:
+            print("Error: File name does not match expected format.")
+            sys.exit(1)
+        with open(input_path, 'r') as f:
+            data = json.load(f)
+        plot_history(data['history'], settings)
