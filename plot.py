@@ -93,7 +93,7 @@ def plot_multiple_histories(folder):
         for history, settings in items:
             epochs = range(1, len(history['val_acc']) + 1)
             label = f"resnet{settings['depth']}"
-            plt.plot(epochs, history['val_acc'], label=label)
+            plt.plot(epochs, history['train_acc'], label=label)
         plt.title(f"Validation Accuracy (Residual={res_key})")
         plt.xlabel("Epochs")
         plt.ylabel("Validation Accuracy (%)")
