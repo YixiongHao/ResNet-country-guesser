@@ -101,57 +101,52 @@ def load_dataset(dataset, train_transform):
     elif dataset == "geo":
         try:
             data = datasets.ImageFolder(KAGGLE_DIR, transform=train_transform)
-            data = FilteredDataset(data, MIN_IMAGES_PER_CLASS)
+            data = FilteredImageFolder(data, MIN_IMAGES_PER_CLASS)
             return (data, len(data.classes))
         except:
             print("kaggle geoguesser data set failed to load")
             return -1
 
 
-class FilteredDataset(Dataset):
+class FilteredImageFolder(ImageFolder):
     def __init__(self, base_dataset, min_samples=50):
-        self.base_dataset = base_dataset
-        self.min_samples = min_samples
-        self.samples = base_dataset.samples
+        self.classes = []
+        self.class_to_idx = {}
+        self.samples = []
 
         # Count label frequencies
         label_counts = defaultdict(int)
         for _, label in base_dataset.samples:
             label_counts[label] += 1
 
-        # Keep only samples where the label has enough samples
-        self.classes = [
-            i
-            for i, (_, label) in enumerate(base_dataset.samples)
-            if label_counts[label] >= min_samples
-        ]
+        # Keep only classes that have enough samples
+        for label in base_dataset.classes:
+            if label_counts[label] >= min_samples:
+                self.class_to_idx[label] = len(self.classes)
+                self.classes.append(label)
+
+        # Fix samples list
+        for i, (path, label) in enumerate(base_dataset.samples):
+            if label_counts[label] >= min_samples:
+                self.samples.append((path, label))
 
     def __len__(self):
-        return len(self.classes)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        real_idx = self.classes[idx]
-        return self.base_dataset[real_idx]
+        return self.samples[idx]
 
 
 class TransformedDataset(Dataset):
-    def __init__(self, dataset, indices, transform):
+    def __init__(self, dataset, transform):
         self.dataset = dataset
-        self.indices = indices
         self.transform = transform
 
     def __len__(self):
-        return len(self.indices)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
-
-        # If the original dataset already returned transformed images,
-        # and you want to re-transform, reload the raw image:
-        if hasattr(self.dataset, "samples"):
-            path, _ = self.dataset.samples[idx]
-            image = Image.open(path).convert("RGB")
-
         image = self.transform(image)
         return image, label
 
@@ -415,11 +410,15 @@ def main():
     dataset, num_classes = load_dataset(args.dataset, train_transform)
     if dataset == -1:
         return
+    print(f"Loaded dataset: {len(dataset)} images, {len(dataset.classes)} classes")
 
     # Split dataset into train and validation
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    print(f"Split dataset:")
+    print(f"\n\tTraining set: {len(train_dataset} images, {len(train_dataset.classes)} classes")
+    print(f"\n\tValidation set: {len(val_dataset} images, {len(val_dataset.classes)} classes")
 
     # Apply different transforms to validation set
     if args.dataset == "country":
@@ -428,8 +427,9 @@ def main():
         )
     elif args.dataset == "geo":
         val_dataset.dataset = TransformedDataset(
-            dataset, val_dataset.indices, val_transform
+            dataset, val_transform
         )
+    print(f"Applied transforms to validation dataset: {len(val_dataset)} images, {len(val_dataset.classes)} classes")
 
     # Create data loaders
     train_loader = DataLoader(
