@@ -6,6 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
 from torch.utils.data import Dataset
+from torchvision.datasets import ImageFolder
 from collections import defaultdict
 from PIL import Image
 from tqdm import tqdm
@@ -92,24 +93,32 @@ def load_dataset(dataset, train_transform):
                 root=DATA_DIR, download=False, transform=train_transform
             )
             return (country_dataset, 211)
-        except:
+        except Exception as e:
             print("Error: Country211 dataset not found in torchvision.")
             print(
                 "You may need to use a custom loader or check your torchvision version."
             )
+            print(e)
             return -1
     elif dataset == "geo":
         try:
             data = datasets.ImageFolder(KAGGLE_DIR, transform=train_transform)
             data = FilteredImageFolder(data, MIN_IMAGES_PER_CLASS)
             return (data, len(data.classes))
-        except:
+        except Exception as e:
             print("kaggle geoguesser data set failed to load")
+            print(e)
             return -1
 
 
 class FilteredImageFolder(ImageFolder):
     def __init__(self, base_dataset, min_samples=50):
+        root = base_dataset.root
+        transform = base_dataset.transform
+        target_transform = base_dataset.target_transform
+        loader = base_dataset.loader
+        super().__init__(root, transform=transform, target_transform=target_transform, loader=loader)
+
         self.classes = []
         self.class_to_idx = {}
         self.samples = []
@@ -121,34 +130,16 @@ class FilteredImageFolder(ImageFolder):
 
         # Keep only classes that have enough samples
         for label in base_dataset.classes:
-            if label_counts[label] >= min_samples:
+            if label_counts[base_dataset.class_to_idx[label]] >= min_samples:
                 self.class_to_idx[label] = len(self.classes)
                 self.classes.append(label)
 
         # Fix samples list
-        for i, (path, label) in enumerate(base_dataset.samples):
+        for path, label in base_dataset.samples:
             if label_counts[label] >= min_samples:
-                self.samples.append((path, label))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        return self.samples[idx]
-
-
-class TransformedDataset(Dataset):
-    def __init__(self, dataset, transform):
-        self.dataset = dataset
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        image, label = self.dataset[idx]
-        image = self.transform(image)
-        return image, label
+                original_class = base_dataset.classes[label]
+                new_class = self.class_to_idx[original_class]
+                self.samples.append((path, new_class))
 
 
 # Custom ResNet without residual connections
@@ -417,19 +408,20 @@ def main():
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
     print(f"Split dataset:")
-    print(f"\n\tTraining set: {len(train_dataset} images, {len(train_dataset.classes)} classes")
-    print(f"\n\tValidation set: {len(val_dataset} images, {len(val_dataset.classes)} classes")
+    print(f"\tTraining set: {len(train_dataset)} images")
+    print(f"\tValidation set: {len(val_dataset)} images")
 
     # Apply different transforms to validation set
-    if args.dataset == "country":
-        val_dataset.dataset = datasets.Country211(
-            root=DATA_DIR, download=False, transform=val_transform
-        )
-    elif args.dataset == "geo":
-        val_dataset.dataset = TransformedDataset(
-            dataset, val_transform
-        )
-    print(f"Applied transforms to validation dataset: {len(val_dataset)} images, {len(val_dataset.classes)} classes")
+    # if args.dataset == "country":
+    #     val_dataset.dataset = datasets.Country211(
+    #         root=DATA_DIR, download=False, transform=val_transform
+    #     )
+    # elif args.dataset == "geo":
+    #     val_dataset.dataset = TransformedDataset(
+    #         dataset, val_transform
+    #     )
+    val_dataset.dataset.transform = val_transform
+    print(f"Applied transforms to validation dataset")
 
     # Create data loaders
     train_loader = DataLoader(
