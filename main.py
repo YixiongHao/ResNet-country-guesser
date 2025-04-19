@@ -17,10 +17,10 @@ import json
 
 
 # yall shouldnt need to change these two
-MODEL_DIR = "/home/hice1/eliang40/ResNet-country-guesser/config+history"
+MODEL_DIR = "/home/hice1/kboyce7/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
 KAGGLE_DIR = "~/scratch/kaggle_dataset"
-MIN_IMAGES_PER_CLASS = 1000
+MIN_IMAGES_PER_CLASS = 100
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
 # note: may need to try dropout + more augmentation to avoid overfitting
