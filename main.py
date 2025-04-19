@@ -17,10 +17,10 @@ import json
 
 
 # yall shouldnt need to change these two
-MODEL_DIR = "/home/hice1/kboyce7/ResNet-country-guesser/config+history"
+MODEL_DIR = "/home/hice1/eliang40/ResNet-country-guesser/config+history"
 DATA_DIR = "~/scratch/resnet/data"
 KAGGLE_DIR = "~/scratch/kaggle_dataset"
-MIN_IMAGES_PER_CLASS = 50
+MIN_IMAGES_PER_CLASS = 1000
 
 # with H100s: python main.py --depth 18 --residual true --transfer false
 # note: may need to try dropout + more augmentation to avoid overfitting
@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate")
     parser.add_argument("--wd", type=float, default=0.0001, help="Weight decay")
     parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for reproducibility"
+        "--seed", type=int, default=420, help="Random seed for reproducibility"
     )
     
     return parser.parse_args()
@@ -249,7 +249,7 @@ def get_model(depth, use_residual, transfer_learning, num_classes):
     return model
 
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, epochs, device):
+def train_model(model, train_loader, val_loader, criterion, optimizer, epochs, device, train_transform, val_transform):
     # Training metrics
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
@@ -263,6 +263,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, epochs, d
         train_loss = 0.0
         train_correct = 0
         train_total = 0
+
+        train_loader.dataset.transform = train_transform
 
         print(f"Epoch {epoch+1}/{epochs}")
         train_progress_bar = tqdm(train_loader, desc="Training")
@@ -297,6 +299,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, epochs, d
         val_loss = 0.0
         val_correct = 0
         val_total = 0
+
+        val_loader.dataset.transform = val_transform
 
         with torch.no_grad():
             val_progress_bar = tqdm(val_loader, desc="Validation")
@@ -381,6 +385,9 @@ def main():
             [
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -420,8 +427,8 @@ def main():
     #     val_dataset.dataset = TransformedDataset(
     #         dataset, val_transform
     #     )
-    val_dataset.dataset.transform = val_transform
-    print(f"Applied transforms to validation dataset")
+#     val_dataset.dataset.transform = val_transform
+ #    print(f"Applied transforms to validation dataset")
 
     # Create data loaders
     train_loader = DataLoader(
@@ -452,7 +459,7 @@ def main():
     print(f"Training model for {args.epochs} epochs...")
     start_time = time.time()
     history, best_model_state, best_epoch = train_model(
-        model, train_loader, val_loader, criterion, optimizer, args.epochs, device
+        model, train_loader, val_loader, criterion, optimizer, args.epochs, device, train_transform, val_transform
     )
     elapsed_time = time.time() - start_time
     print(f"Training completed in {elapsed_time:.2f} seconds")
