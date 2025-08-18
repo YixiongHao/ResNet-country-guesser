@@ -102,18 +102,74 @@ def plot_multiple_histories(folder):
         plt.savefig(outfile)
         print(f"Saved multi-model plot for residual={res_key} to {outfile}")
 
+def compare_histories(file1, file2):
+    """
+    Plots a comparison of the loss and accuracy for two history files.
+    Two separate figures are produced: one for loss and one for accuracy.
+    Legends indicate whether each model was trained with or without residual connections.
+    """
+    histories = []
+    settings_list = []
+    files = [file1, file2]
+    
+    for file in files:
+        settings = parse_model_settings(file)
+        if settings is None:
+            print(f"Error: File {file} does not match expected format.")
+            sys.exit(1)
+        with open(file, 'r') as f:
+            data = json.load(f)
+        history = data['history']
+        histories.append(history)
+        settings_list.append(settings)
+        
+    # Assume histories have same number of epochs
+    epochs = range(1, len(histories[0]['val_acc']) + 1)
+    
+    # Plot Loss Comparison
+    plt.figure(figsize=(8, 6))
+    for history, settings in zip(histories, settings_list):
+        residual_label = "with residual" if settings['residual'] else "without residual"
+        label_train = f"resnet{settings['depth']} ({residual_label}) - Train Loss"
+        label_val = f"resnet{settings['depth']} ({residual_label}) - Val Loss"
+        plt.plot(epochs, history['train_loss'], label=label_train)
+        plt.plot(epochs, history['val_loss'], label=label_val)
+    plt.title("Comparison of Losses")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    outfile = f"{PLOT_DIR}/comparison_loss.png"
+    plt.savefig(outfile)
+    print(f"Saved comparison loss plot to {outfile}")
+    
+    # Plot Accuracy Comparison
+    plt.figure(figsize=(8, 6))
+    for history, settings in zip(histories, settings_list):
+        residual_label = "with residual" if settings['residual'] else "without residual"
+        label_train = f"resnet{settings['depth']} ({residual_label}) - Train Accuracy"
+        label_val = f"resnet{settings['depth']} ({residual_label}) - Val Accuracy"
+        plt.plot(epochs, history['train_acc'], label=label_train)
+        plt.plot(epochs, history['val_acc'], label=label_val)
+    plt.title("Comparison of Accuracies")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy (%)")
+    plt.legend()
+    outfile = f"{PLOT_DIR}/comparison_accuracy.png"
+    plt.savefig(outfile)
+    print(f"Saved comparison accuracy plot to {outfile}")
+
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Usage: python plot.py <history_json_file | history_directory>")
+    if len(sys.argv) < 3:
+        print("Usage:")
+        print("  python plot.py single <history_json_file>")
+        print("  python plot.py multiple <history_folder>")
+        print("  python plot.py comparison <history_json_file1> <history_json_file2>")
         sys.exit(1)
         
-    input_path = sys.argv[1]
+    mode = sys.argv[1].lower()
     
-    if os.path.isdir(input_path):
-        # Multiple models mode
-        plot_multiple_histories(input_path)
-    else:
-        # Single model mode
+    if mode == "single":
+        input_path = sys.argv[2]
         settings = parse_model_settings(input_path)
         if not settings:
             print("Error: File name does not match expected format.")
@@ -121,3 +177,22 @@ if __name__ == '__main__':
         with open(input_path, 'r') as f:
             data = json.load(f)
         plot_history(data['history'], settings)
+        
+    elif mode == "multiple":
+        folder = sys.argv[2]
+        if not os.path.isdir(folder):
+            print("Error: Provided path is not a directory.")
+            sys.exit(1)
+        plot_multiple_histories(folder)
+        
+    elif mode == "comparison":
+        if len(sys.argv) != 4:
+            print("Error: Comparison mode requires two history files.")
+            sys.exit(1)
+        file1 = sys.argv[2]
+        file2 = sys.argv[3]
+        compare_histories(file1, file2)
+        
+    else:
+        print("Error: Mode must be one of 'single', 'multiple', or 'comparison'.")
+        sys.exit(1)
